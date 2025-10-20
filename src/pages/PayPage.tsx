@@ -2,9 +2,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useRef } from "react";
 
 import { motion } from "framer-motion";
-import { Card, CardContent, CardFooter } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import axiosInstance from "../services/axiosInstance";
+import axiosInstance from "@/services/axiosInstance";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export default function PayPage() {
   const { id } = useParams();
@@ -14,7 +14,7 @@ export default function PayPage() {
   // Function to simulate payment
   const handlePay = async () => {
     await axiosInstance.post(`/pay/${id}`);
-    alert("✅ Payment simulated! You can return to the booth now.");
+    window.location.href = `/#/choose-control/${id}?device=mobile`;
   };
 
   // Reset the timeout when there's activity
@@ -59,7 +59,7 @@ export default function PayPage() {
               size="lg"
               className="bg-yellow-500 hover:bg-yellow-400 text-black font-semibold px-8 py-6 rounded-full transition-transform hover:scale-[1.03]"
             >
-              Pay Now 💸
+              Pay Now
             </Button>
 
             <p className="text-yellow-100/70 text-sm">
