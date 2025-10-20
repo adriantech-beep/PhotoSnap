@@ -25,9 +25,11 @@ const QRPage = () => {
         setLoading(false);
       });
 
-    socket.on("paymentSuccess", () => {
+    socket.on("paymentSuccess", ({ id }) => {
       setPaid(true);
-      setTimeout(() => (window.location.href = "/#/edit"));
+      setTimeout(() => {
+        window.location.href = `/#/choose-control/${id}?device=booth`;
+      }, 1500);
     });
 
     return () => {
