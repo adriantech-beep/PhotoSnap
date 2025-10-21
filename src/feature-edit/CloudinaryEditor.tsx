@@ -8,6 +8,33 @@ interface CloudinaryEditorProps {
   onEdited: (url: string) => void;
 }
 
+// ✅ Define Cloudinary MediaEditor export type
+interface CloudinaryExportEvent {
+  secure_url?: string;
+  url?: string;
+  public_id?: string;
+}
+
+declare global {
+  interface Window {
+    cloudinary: {
+      mediaEditor: () => {
+        update: (options: {
+          cloudName: string;
+          publicIds: string[];
+          steps: string[];
+        }) => void;
+        show: () => void;
+        hide: () => void;
+        on: (
+          event: string,
+          callback: (data: CloudinaryExportEvent) => void
+        ) => void;
+      };
+    };
+  }
+}
+
 const CloudinaryEditor = ({
   publicId,
   cloudName,
@@ -30,7 +57,6 @@ const CloudinaryEditor = ({
   }, []);
 
   const openEditor = () => {
-    // @ts-ignore
     const editor = window.cloudinary.mediaEditor();
     editor.update({
       cloudName,
@@ -39,20 +65,24 @@ const CloudinaryEditor = ({
     });
     editor.show();
 
-    editor.on("export", (data: any) => {
-      onEdited(data.secure_url || data.url);
-      editor.hide();
+    // ✅ Strongly typed event data
+    editor.on("export", (data: CloudinaryExportEvent) => {
+      const finalUrl = data.secure_url || data.url;
+      if (finalUrl) {
+        onEdited(finalUrl);
+        editor.hide();
+      } else {
+        console.error("Export event missing URL:", data);
+      }
     });
   };
 
   const handleRemoveBackground = async () => {
     try {
       setLoading(true);
-
       const imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${currentPublicId}.png`;
 
       const cleanedImage = await removeBgFromServer(imageUrl);
-
       const blob = await (await fetch(cleanedImage)).blob();
 
       const formData = new FormData();

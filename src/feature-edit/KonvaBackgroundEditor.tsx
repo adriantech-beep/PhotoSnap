@@ -3,6 +3,7 @@ import { Stage, Layer, Image as KonvaImage, Rect } from "react-konva";
 import useImage from "use-image";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import type { Stage as KonvaStage } from "konva/lib/Stage";
 
 const cloudName = "dni2zk7ht";
 
@@ -60,14 +61,14 @@ export default function KonvaBackgroundEditor({
 }: KonvaBackgroundEditorProps) {
   const [selectedBg, setSelectedBg] = useState<string>(backgrounds[0].src);
   const [subject] = useImage(imageUrl, "anonymous");
-
   const [background] = useImage(selectedBg, "anonymous");
 
-  const stageRef = useRef<any>(null);
+  const stageRef = useRef<KonvaStage | null>(null);
 
   const handleExport = () => {
-    if (stageRef.current) {
-      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 });
+    const stage = stageRef.current;
+    if (stage) {
+      const dataUrl = stage.toDataURL({ pixelRatio: 2 });
       onDone(dataUrl);
     }
   };

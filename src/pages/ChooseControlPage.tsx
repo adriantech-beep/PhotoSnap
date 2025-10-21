@@ -8,31 +8,27 @@ const socket = io(import.meta.env.VITE_API_BASE_URL, {
 
 export default function ChooseControlPage() {
   const { id: sessionId } = useParams();
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<"booth" | "mobile" | null>(null);
   const [message, setMessage] = useState("Waiting for someone to choose...");
 
   useEffect(() => {
     socket.emit("joinSession", sessionId);
 
-    // ✅ Get query param even in HashRouter
     const query = new URLSearchParams(window.location.hash.split("?")[1]);
     const device = query.get("device") || "booth";
     console.log("Detected device:", device);
 
-    // ✅ Ask backend for existing control state (in case of refresh)
     socket.emit("getControlMode", { sessionId });
 
     socket.on("controlModeSelected", ({ controlMode }) => {
       console.log("controlModeSelected received:", controlMode);
 
       if (controlMode === device) {
-        // This device is the controller
         setMessage("You are now controlling the editing!");
         setTimeout(() => {
           window.location.href = `/#/edit/${sessionId}?device=${device}`;
         }, 1000);
       } else {
-        // Other device is in control
         setMessage(
           `Editing is controlled on the ${
             controlMode === "booth" ? "booth" : "mobile"
@@ -46,7 +42,7 @@ export default function ChooseControlPage() {
     };
   }, [sessionId]);
 
-  const handleSelect = (mode) => {
+  const handleSelect = (mode: "booth" | "mobile") => {
     if (selected) return;
     setSelected(mode);
     setMessage(`You selected ${mode} control...`);
