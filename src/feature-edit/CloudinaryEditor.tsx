@@ -1,39 +1,38 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import ChristmasTree from "@/assets/Christmas-Themed-Images/Christmas-Tree-Bg.jpg";
-import ChristmasAlley from "@/assets/Christmas-Themed-Images/Christmas-Alley-Bg.jpg";
-import ChristmasNipaHut from "@/assets/Christmas-Themed-Images/Christmas-NipaHut.jpg";
-import ChristmasPineTree from "@/assets/Christmas-Themed-Images/Christmas-PineTrees.jpg";
-import ChristmasLightBlurred from "@/assets/Christmas-Themed-Images/Christmas-Light-Blurred-Bg.jpg";
-
-const backgrounds = [
-  {
-    name: ChristmasTree,
-    publicId: "Christmas-Tree-Bg_b772km",
-  },
-  {
-    name: ChristmasAlley,
-    publicId: "Christmas-Alley-Bg_xwmdkt",
-  },
-  {
-    name: ChristmasNipaHut,
-    publicId: "Christmas-NipaHut_fcam5s",
-  },
-  {
-    name: ChristmasPineTree,
-    publicId: "Christmas-PineTrees_cbouc5",
-  },
-  {
-    name: ChristmasLightBlurred,
-    publicId: "Christmas-Light-Blurred-Bg_yqmuce",
-  },
-];
+import { removeBgFromServer } from "@/utils/removeBgFromServer";
 
 interface CloudinaryEditorProps {
   publicId: string;
   cloudName: string;
   onEdited: (url: string) => void;
+}
+
+// ✅ Define Cloudinary MediaEditor export type
+interface CloudinaryExportEvent {
+  secure_url?: string;
+  url?: string;
+  public_id?: string;
+}
+
+declare global {
+  interface Window {
+    cloudinary: {
+      mediaEditor: () => {
+        update: (options: {
+          cloudName: string;
+          publicIds: string[];
+          steps: string[];
+        }) => void;
+        show: () => void;
+        hide: () => void;
+        on: (
+          event: string,
+          callback: (data: CloudinaryExportEvent) => void
+        ) => void;
+      };
+    };
+  }
 }
 
 const CloudinaryEditor = ({
@@ -42,10 +41,8 @@ const CloudinaryEditor = ({
   onEdited,
 }: CloudinaryEditorProps) => {
   const [editorReady, setEditorReady] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentPublicId, setCurrentPublicId] = useState(publicId);
-  const [prompt, setPrompt] = useState("a beach at sunset");
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -60,7 +57,6 @@ const CloudinaryEditor = ({
   }, []);
 
   const openEditor = () => {
-    // @ts-ignore
     const editor = window.cloudinary.mediaEditor();
     editor.update({
       cloudName,
@@ -69,36 +65,29 @@ const CloudinaryEditor = ({
     });
     editor.show();
 
-    editor.on("export", (data: any) => {
-      console.log("Exported:", data);
-      onEdited(data.secure_url || data.url);
-      editor.hide();
-      setIsEditing(false);
+    // ✅ Strongly typed event data
+    editor.on("export", (data: CloudinaryExportEvent) => {
+      const finalUrl = data.secure_url || data.url;
+      if (finalUrl) {
+        onEdited(finalUrl);
+        editor.hide();
+      } else {
+        console.error("Export event missing URL:", data);
+      }
     });
   };
 
-  
   const handleRemoveBackground = async () => {
-    await runTransformation("e_background_removal,f_png");
-  };
-
-  const runTransformation = async (effect: string) => {
     try {
       setLoading(true);
+      const imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${currentPublicId}.png`;
 
-      const transformedUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${effect}/${currentPublicId}.png`;
-
-      console.log("🔗 Transformed URL:", transformedUrl);
-
-      const response = await fetch(transformedUrl, { mode: "cors" });
-      if (!response.ok)
-        throw new Error(`Transformation failed: ${response.statusText}`);
-
-      const blob = await response.blob();
+      const cleanedImage = await removeBgFromServer(imageUrl);
+      const blob = await (await fetch(cleanedImage)).blob();
 
       const formData = new FormData();
       formData.append("file", blob);
-      formData.append("upload_preset", "PhotoSnap-Upload"); // ⚠️ must match your preset name
+      formData.append("upload_preset", "PhotoSnap-Upload");
 
       const uploadResponse = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
@@ -106,51 +95,15 @@ const CloudinaryEditor = ({
       );
 
       const uploadData = await uploadResponse.json();
-      if (!uploadData.secure_url) throw new Error("Upload failed");
-
-      console.log("✅ Upload success:", uploadData.secure_url);
+      if (!uploadData.secure_url) throw new Error("Cloudinary upload failed");
 
       setCurrentPublicId(uploadData.public_id);
       onEdited(uploadData.secure_url);
-    } catch (err) {
-      console.error("❌ Error applying effect:", err);
+    } catch (error) {
+      console.error("❌ Background removal error:", error);
       alert(
-        "Background removal failed. Ensure your Cloudinary account has the AI Background Removal add-on enabled."
+        "Background removal failed. Please try again or check your backend logs."
       );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleApplyBackground = async (bgPublicId: string) => {
-    try {
-      setLoading(true);
-
-      const transformedUrl = `https://res.cloudinary.com/${cloudName}/image/upload/l_${currentPublicId},g_center/${bgPublicId}.png`;
-
-      console.log("🔗 Combined URL:", transformedUrl);
-
-      const response = await fetch(transformedUrl);
-      if (!response.ok) throw new Error("Failed to merge background");
-      const blob = await response.blob();
-
-      const formData = new FormData();
-      formData.append("file", blob);
-      formData.append("upload_preset", "PhotoSnap-Upload");
-
-      const uploadRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        { method: "POST", body: formData }
-      );
-
-      const data = await uploadRes.json();
-      if (!data.secure_url) throw new Error("Upload failed");
-
-      setCurrentPublicId(data.public_id);
-      onEdited(data.secure_url);
-    } catch (err) {
-      console.error(err);
-      alert("Error merging background");
     } finally {
       setLoading(false);
     }
@@ -159,61 +112,33 @@ const CloudinaryEditor = ({
   if (!editorReady) return <p className="text-center">Loading editor...</p>;
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <img
-        src={`https://res.cloudinary.com/${cloudName}/image/upload/${currentPublicId}.png`}
-        alt="preview"
-        className="w-80 h-auto rounded-md shadow-md"
-      />
-
-      <div className="flex flex-col gap-2 items-center">
-        <select
-          onChange={(e) => handleApplyBackground(e.target.value)}
-          className="border rounded-md p-2"
-          defaultValue=""
-        >
-          <option value="">Select background...</option>
-          {backgrounds.map((bg) => (
-            <option key={bg.publicId} value={bg.publicId}>
-              {bg.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-2 items-center">
-        <Input
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe your desired background..."
-          className="w-64"
+    <div className="flex flex-col items-center justify-center gap-4">
+      <div className="w-3xl">
+        <img
+          src={`https://res.cloudinary.com/${cloudName}/image/upload/${currentPublicId}.png`}
+          alt="preview"
+          className="w-full h-auto rounded-md shadow-md"
         />
-        <Button
-          onClick={handleRemoveBackground}
-          disabled={loading}
-          className="bg-purple-500 hover:bg-purple-600 text-white"
-        >
-          {loading ? "Replacing..." : "Replace Background"}
-        </Button>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex items-center justify-center gap-4 mt-6">
         <Button
           onClick={handleRemoveBackground}
           disabled={loading}
-          className="bg-blue-500 hover:bg-blue-600 text-white"
+          className={`rounded-full px-6 py-3 text-base font-semibold shadow-md transition-all duration-300 ${
+            loading
+              ? "bg-blue-300 cursor-not-allowed"
+              : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white hover:shadow-lg hover:scale-105"
+          }`}
         >
-          {loading ? "Removing..." : "Remove Background"}
+          {loading ? "Processing..." : "✨ Remove Background"}
         </Button>
 
         <Button
-          onClick={() => {
-            setIsEditing(true);
-            openEditor();
-          }}
-          className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
+          onClick={openEditor}
+          className="rounded-full px-6 py-3 text-base font-semibold shadow-md bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-500 hover:to-yellow-600 hover:shadow-lg hover:scale-105 transition-all duration-300"
         >
-          Open Editor
+          🎨 Edit Quality
         </Button>
       </div>
     </div>

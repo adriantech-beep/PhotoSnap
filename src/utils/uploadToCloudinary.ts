@@ -11,5 +11,5 @@ export const uploadToCloudinary = async (file: File | Blob) => {
     }
   );
   const data = await res.json();
-  return data; // contains public_id, secure_url, etc.
+  return data;
 };

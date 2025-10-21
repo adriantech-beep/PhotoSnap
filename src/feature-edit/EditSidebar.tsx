@@ -7,14 +7,14 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Camera, Image, Settings, HelpCircle, LogOut } from "lucide-react";
+import { Camera, Image, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { title: "Live View", url: "live", icon: Camera },
   { title: "Gallery", url: "editor", icon: Image },
-  { title: "Settings", url: "settings", icon: Settings },
-  { title: "Help & Support", url: "help", icon: HelpCircle },
+  // { title: "Settings", url: "settings", icon: Settings },
+  // { title: "Help & Support", url: "help", icon: HelpCircle },
 ];
 
 type SidebarLinkProps = {
