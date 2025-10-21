@@ -7,7 +7,8 @@ const OpenCamera = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const photoRef = useRef<HTMLCanvasElement>(null);
   const [isVideoOn, setIsVideoOn] = useState(false);
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
   const startCamera = async () => {
@@ -27,10 +28,11 @@ const OpenCamera = () => {
     setIsVideoOn(false);
   };
 
-  const handleCapture = () => {
+  const handleCapture = async () => {
     const video = videoRef.current;
     const canvas = photoRef.current;
     if (!video || !canvas) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -38,25 +40,30 @@ const OpenCamera = () => {
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
 
-    const dataUrl = canvas.toDataURL("image/png");
-    setPhoto(dataUrl);
-    stopCamera();
+    canvas.toBlob((blob) => {
+      if (blob) {
+        setPhotoBlob(blob);
+        setPhotoPreview(URL.createObjectURL(blob));
+        stopCamera();
+      }
+    }, "image/png");
   };
 
   const handleRetake = async () => {
-    setPhoto(null);
+    setPhotoBlob(null);
+    setPhotoPreview(null);
     setIsEditing(false);
     await startCamera();
   };
 
-  if (isEditing && photo) {
-    return <PhotoFlow photoBlob={photo} />;
+  if (isEditing && photoBlob) {
+    return <PhotoFlow photoBlob={photoBlob} />;
   }
 
   return (
     <section className="flex flex-col items-center gap-6 p-6">
       <div className="relative border border-zinc-700 rounded-lg overflow-hidden bg-black w-[640px] h-[480px] flex justify-center items-center">
-        {!photo ? (
+        {!photoPreview ? (
           <video
             ref={videoRef}
             autoPlay
@@ -65,7 +72,7 @@ const OpenCamera = () => {
           />
         ) : (
           <img
-            src={photo}
+            src={photoPreview}
             alt="Captured"
             className="w-full h-full object-cover"
           />
@@ -75,7 +82,7 @@ const OpenCamera = () => {
       <canvas ref={photoRef} className="hidden" />
 
       <div className="flex gap-4">
-        {!photo ? (
+        {!photoPreview ? (
           <>
             <Button
               onClick={isVideoOn ? stopCamera : startCamera}
