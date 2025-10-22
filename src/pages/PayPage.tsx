@@ -11,27 +11,24 @@ export default function PayPage() {
   const navigate = useNavigate();
   const timeoutRef = useRef(0);
 
-  // Function to simulate payment
   const handlePay = async () => {
     await axiosInstance.post(`/pay/${id}`);
     window.location.href = `/#/choose-control/${id}?device=mobile`;
   };
 
-  // Reset the timeout when there's activity
   const resetTimeout = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       alert("⚠️ Session timed out. Returning to home screen.");
-      navigate("/"); // Redirect back to home (QR generation)
-    }, 60000); // 60 seconds of idle time
+      navigate("/");
+    }, 60000);
   };
 
-  // Listen for user activity
   useEffect(() => {
     const events = ["mousemove", "mousedown", "keypress", "touchstart"];
     events.forEach((event) => window.addEventListener(event, resetTimeout));
 
-    resetTimeout(); // Start timer initially
+    resetTimeout();
 
     return () => {
       events.forEach((event) =>

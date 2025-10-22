@@ -1,0 +1,1 @@
+cp -r node_modules/@imgly/background-removal/dist/models public/imgly/

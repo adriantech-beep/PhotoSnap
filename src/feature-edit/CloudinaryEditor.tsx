@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { removeBgFromServer } from "@/utils/removeBgFromServer";
 
@@ -8,81 +8,22 @@ interface CloudinaryEditorProps {
   onEdited: (url: string) => void;
 }
 
-// ✅ Define Cloudinary MediaEditor export type
-interface CloudinaryExportEvent {
-  secure_url?: string;
-  url?: string;
-  public_id?: string;
-}
-
-declare global {
-  interface Window {
-    cloudinary: {
-      mediaEditor: () => {
-        update: (options: {
-          cloudName: string;
-          publicIds: string[];
-          steps: string[];
-        }) => void;
-        show: () => void;
-        hide: () => void;
-        on: (
-          event: string,
-          callback: (data: CloudinaryExportEvent) => void
-        ) => void;
-      };
-    };
-  }
-}
-
 const CloudinaryEditor = ({
   publicId,
   cloudName,
   onEdited,
 }: CloudinaryEditorProps) => {
-  const [editorReady, setEditorReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentPublicId, setCurrentPublicId] = useState(publicId);
-
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://media-editor.cloudinary.com/all.js";
-    script.async = true;
-    script.onload = () => setEditorReady(true);
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  const openEditor = () => {
-    const editor = window.cloudinary.mediaEditor();
-    editor.update({
-      cloudName,
-      publicIds: [currentPublicId],
-      steps: ["resize", "crop", "rotate", "overlay", "export"],
-    });
-    editor.show();
-
-    // ✅ Strongly typed event data
-    editor.on("export", (data: CloudinaryExportEvent) => {
-      const finalUrl = data.secure_url || data.url;
-      if (finalUrl) {
-        onEdited(finalUrl);
-        editor.hide();
-      } else {
-        console.error("Export event missing URL:", data);
-      }
-    });
-  };
 
   const handleRemoveBackground = async () => {
     try {
       setLoading(true);
+
       const imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${currentPublicId}.png`;
 
       const cleanedImage = await removeBgFromServer(imageUrl);
+
       const blob = await (await fetch(cleanedImage)).blob();
 
       const formData = new FormData();
@@ -101,15 +42,11 @@ const CloudinaryEditor = ({
       onEdited(uploadData.secure_url);
     } catch (error) {
       console.error("❌ Background removal error:", error);
-      alert(
-        "Background removal failed. Please try again or check your backend logs."
-      );
+      alert("Background removal failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
-
-  if (!editorReady) return <p className="text-center">Loading editor...</p>;
 
   return (
     <div className="flex flex-col items-center justify-center gap-4">
@@ -132,13 +69,6 @@ const CloudinaryEditor = ({
           }`}
         >
           {loading ? "Processing..." : "✨ Remove Background"}
-        </Button>
-
-        <Button
-          onClick={openEditor}
-          className="rounded-full px-6 py-3 text-base font-semibold shadow-md bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-500 hover:to-yellow-600 hover:shadow-lg hover:scale-105 transition-all duration-300"
-        >
-          🎨 Edit Quality
         </Button>
       </div>
     </div>
