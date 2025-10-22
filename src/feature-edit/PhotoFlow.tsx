@@ -64,7 +64,10 @@ const PhotoFlow = ({ photoBlob }: { photoBlob: Blob }) => {
         <CloudinaryEditor
           cloudName="dni2zk7ht"
           publicId={publicId}
-          onEdited={setEditedUrl}
+          onEdited={(dataUrl) => {
+            // Instead of uploading now, just store the data URL
+            setEditedUrl(dataUrl);
+          }}
         />
       )}
 

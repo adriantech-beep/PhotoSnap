@@ -26,7 +26,7 @@ export default function ChooseControlPage() {
       if (controlMode === device) {
         setMessage("You are now controlling the editing!");
         setTimeout(() => {
-          window.location.href = `/#/edit/${sessionId}?device=${device}`;
+          window.location.href = `/#/live/${sessionId}?device=${device}`;
         }, 1000);
       } else {
         setMessage(
