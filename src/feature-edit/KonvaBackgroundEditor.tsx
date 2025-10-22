@@ -371,7 +371,9 @@ export default function KonvaBackgroundEditor({
                     />
                     {subject && (
                       <KonvaImage
-                        ref={(el) => (stripRefs.current[idx] = el)}
+                        ref={(el) => {
+                          stripRefs.current[idx] = el;
+                        }}
                         image={subject}
                         x={f.x + f.width * 0.25 + frameTransforms[idx].x}
                         y={f.y + f.height * 0.25 + frameTransforms[idx].y}
