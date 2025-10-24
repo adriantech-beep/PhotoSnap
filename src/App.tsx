@@ -5,7 +5,7 @@ import WelcomePage from "./pages/WelcomePage";
 import QRPage from "./pages/QRPage";
 import ChooseControlPage from "./pages/ChooseControlPage";
 // import EditPage from "./pages/EditPage";
-import OpenCamera from "./feature-edit/OpenCamera";
+import OpenCamera from "./camera/OpenCamera";
 
 function App() {
   return (
