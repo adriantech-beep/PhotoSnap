@@ -36,7 +36,6 @@ const OpenCamera = () => {
   const maxShots = 4;
   const delayBetweenShots = 1500;
 
-  /** CAMERA CONTROL **/
   const startCamera = async () => {
     if (isVideoOn) return;
     try {
@@ -197,12 +196,11 @@ const OpenCamera = () => {
   };
 
   const handleEditPhotos = () => {
-    // Show short "processing" state before moving to PhotoFlow
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
       setIsEditing(true);
-    }, 1200); // small delay for better UX
+    }, 1200);
   };
   /** EDIT MODE **/
   if (isProcessing) {
@@ -281,7 +279,6 @@ const OpenCamera = () => {
 
       <canvas ref={photoRef} className="hidden" />
 
-      {/* CONTROLS */}
       <div className="flex flex-wrap justify-center gap-3 md:gap-4 mt-4">
         {!isVideoOn && photoBlobs.length === 0 && (
           <Button

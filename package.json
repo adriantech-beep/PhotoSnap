@@ -23,6 +23,7 @@
     "clsx": "^2.1.1",
     "fabric": "^6.7.1",
     "fabricjs-react": "^2.1.0",
+    "html-to-image": "^1.11.13",
     "konva": "^10.0.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
