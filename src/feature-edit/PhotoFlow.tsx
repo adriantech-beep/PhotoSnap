@@ -1,137 +1,256 @@
-import { useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { uploadToCloudinary } from "@/utils/uploadToCloudinary";
 import CloudinaryEditor from "./CloudinaryEditor";
 import KonvaBackgroundEditor from "./KonvaBackgroundEditor";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
-const PhotoFlow = ({ photoBlob }: { photoBlob: Blob }) => {
-  const [publicId, setPublicId] = useState<string | null>(null);
-  const [editedUrl, setEditedUrl] = useState<string | null>(null);
-  const [finalUrl, setFinalUrl] = useState<string | null>(null);
+interface PhotoFlowProps {
+  photoBlobs: Blob[];
+  onComplete?: (finalUrls: string[]) => void;
+  autoStartUpload?: boolean;
+}
+
+const PhotoFlow = ({
+  photoBlobs,
+  onComplete,
+  autoStartUpload = false,
+}: PhotoFlowProps) => {
+  const [uploadProgress, setUploadProgress] = useState<number[]>([]);
+  const [uploaded, setUploaded] = useState<any[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [editedUrls, setEditedUrls] = useState<string[]>([]);
+  const [finalUrls, setFinalUrls] = useState<string[]>([]);
+  const [stage, setStage] = useState<"upload" | "cleanup" | "edit" | "done">(
+    "upload"
+  );
 
-  const handleUpload = async () => {
+  const hasStartedUpload = useRef(false);
+
+  /** ─────────── Upload Function (Memoized) ─────────── **/
+  const handleBatchUpload = useCallback(async () => {
+    if (!photoBlobs.length) return;
+
+    setStage("upload");
     setIsUploading(true);
+    setUploadProgress(new Array(photoBlobs.length).fill(0));
+
     try {
-      const res = await uploadToCloudinary(photoBlob);
-      setPublicId(res.public_id);
+      const results = [];
+
+      for (let i = 0; i < photoBlobs.length; i++) {
+        const blob = photoBlobs[i];
+        const res = await uploadToCloudinary(blob);
+        results.push(res);
+        setUploadProgress((prev) => {
+          const updated = [...prev];
+          updated[i] = 100;
+          return updated;
+        });
+        await new Promise((r) => setTimeout(r, 400)); // small pacing delay
+      }
+
+      setUploaded(results);
+      setStage("cleanup");
     } catch (error) {
-      console.error("Upload failed:", error);
+      console.error("Batch upload failed:", error);
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [photoBlobs]);
 
+  /** ─────────── Auto Upload Effect ─────────── **/
+  useEffect(() => {
+    if (autoStartUpload && !hasStartedUpload.current && photoBlobs.length > 0) {
+      hasStartedUpload.current = true; // run only once
+      handleBatchUpload();
+    }
+  }, [autoStartUpload, handleBatchUpload, photoBlobs]);
+
+  /** ─────────── Handle Final Upload ─────────── **/
   const handleFinalUpload = async (dataUrl: string) => {
     try {
-      setIsUploading(true);
-
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
-
+      const blob = await (await fetch(dataUrl)).blob();
       const result = await uploadToCloudinary(blob);
-      setFinalUrl(result.secure_url);
 
-      console.log("✅ Final image uploaded:", result.secure_url);
+      setFinalUrls((prev) => {
+        const updated = [...prev];
+        updated[currentIndex] = result.secure_url;
+        return updated;
+      });
+
+      if (currentIndex < uploaded.length - 1) {
+        setCurrentIndex((i) => i + 1);
+      } else {
+        const allFinals = [...finalUrls];
+        allFinals[currentIndex] = result.secure_url;
+        setFinalUrls(allFinals);
+        setStage("done");
+        onComplete?.(allFinals);
+      }
     } catch (error) {
-      console.error("Failed to upload final image:", error);
-    } finally {
-      setIsUploading(false);
+      console.error("Final upload failed:", error);
     }
   };
 
+  const stageLabel = {
+    upload: "📤 Uploading Photos",
+    cleanup: "🧼 Removing Backgrounds",
+    edit: "🎨 Background Editing",
+    done: "✅ All Photos Ready!",
+  }[stage];
+
   return (
-    <div className="h-full flex flex-col items-center justify-center space-y-6">
-      {!publicId && (
-        <div className="flex flex-col items-center justify-center space-y-4">
-          <div className="w-32 h-32 flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100 rounded-full shadow-inner">
-            <Button
-              onClick={handleUpload}
-              disabled={isUploading}
-              className="rounded-full px-6 py-6 text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md hover:scale-105 hover:shadow-lg transition-all duration-300"
-            >
-              {isUploading ? "Uploading..." : "Upload Image 😊"}
-            </Button>
-          </div>
-          <p className="text-gray-500 text-sm">
-            Tap to start editing your photo
-          </p>
-        </div>
-      )}
+    <section className="flex flex-col items-center justify-center p-6 w-full max-w-6xl mx-auto space-y-10 text-center">
+      {/* Stage Header */}
+      <motion.h2
+        key={stage}
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="text-2xl md:text-3xl font-bold text-yellow-400"
+      >
+        {stageLabel}
+      </motion.h2>
 
-      {publicId && !editedUrl && (
-        <CloudinaryEditor
-          cloudName="dni2zk7ht"
-          publicId={publicId}
-          onEdited={(dataUrl) => {
-            // Instead of uploading now, just store the data URL
-            setEditedUrl(dataUrl);
-          }}
-        />
-      )}
-
-      {editedUrl && !finalUrl && (
-        <KonvaBackgroundEditor
-          imageUrl={editedUrl}
-          onDone={handleFinalUpload}
-        />
-      )}
-
-      {finalUrl && (
-        <motion.div
-          className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-yellow-400 to-yellow-600 p-8 rounded-2xl shadow-2xl space-y-6"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        >
-          <div className="relative">
-            <motion.div
-              className="absolute inset-0 rounded-full bg-gradient-to-r from-green-400 via-yellow-300 to-pink-400 blur-2xl opacity-70 animate-pulse"
-              style={{ scale: 1.2 }}
-            />
-            <motion.img
-              src={finalUrl}
-              alt="Final"
-              className="relative w-64 h-64 object-cover rounded-2xl shadow-2xl border-4 border-white"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.3, duration: 0.6 }}
-            />
-          </div>
-
-          <motion.p
-            className="text-white text-xl font-semibold flex items-center gap-2 bg-green-600 px-4 py-2 rounded-full shadow-md"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.6 }}
-          >
-            Upload Complete!
-          </motion.p>
-
-          <motion.a
-            href={finalUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-100 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-medium shadow-lg transition-transform hover:scale-105"
+      <AnimatePresence mode="wait">
+        {/* ─── UPLOAD PHASE ─── */}
+        {stage === "upload" && (
+          <motion.div
+            key="upload"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col items-center gap-6"
           >
-            View on Cloudinary
-          </motion.a>
+            {isUploading ? (
+              <>
+                <p className="text-yellow-300 font-medium">
+                  Uploading {uploadProgress.filter((p) => p === 100).length} /{" "}
+                  {photoBlobs.length} photos...
+                </p>
 
-          <motion.button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-5 py-2 bg-white/90 text-gray-700 font-semibold rounded-lg hover:bg-white transition-all duration-300 shadow-md hover:shadow-xl"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+                  {photoBlobs.map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-24 h-24 bg-black/60 border-2 border-yellow-400 rounded-lg flex items-center justify-center relative"
+                    >
+                      <motion.div
+                        className="absolute bottom-0 left-0 h-1 bg-yellow-500"
+                        style={{
+                          width: `${uploadProgress[i]}%`,
+                          transition: "width 0.3s ease",
+                        }}
+                      />
+                      <span className="text-yellow-400 font-semibold z-10 text-sm">
+                        {uploadProgress[i]}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-yellow-400 mt-4"
+              >
+                Preparing upload...
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
+        {/* ─── CLEANUP PHASE ─── */}
+        {stage === "cleanup" && uploaded.length > 0 && (
+          <motion.div
+            key="cleanup"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="w-full flex justify-center"
           >
-            Start Over
-          </motion.button>
-        </motion.div>
-      )}
-    </div>
+            <CloudinaryEditor
+              cloudName="dni2zk7ht"
+              publicIds={uploaded.map((u) => u.public_id)}
+              onEdited={(urls) => {
+                console.log("🧼 Cleaned URLs received:", urls);
+                if (urls.length === 0) {
+                  console.warn(
+                    "⚠️ No cleaned images returned — falling back to originals."
+                  );
+                  const fallbackUrls = uploaded.map(
+                    (u) =>
+                      `https://res.cloudinary.com/dni2zk7ht/image/upload/${u.public_id}`
+                  );
+                  setEditedUrls(fallbackUrls);
+                } else {
+                  setEditedUrls(urls);
+                }
+                setStage("edit");
+              }}
+            />
+          </motion.div>
+        )}
+
+        {/* ─── EDIT PHASE ─── */}
+        {stage === "edit" && editedUrls.length > 0 && (
+          <motion.div
+            key="edit"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="w-full flex justify-center"
+          >
+            <KonvaBackgroundEditor
+              imageUrls={editedUrls}
+              onDone={handleFinalUpload}
+            />
+          </motion.div>
+        )}
+
+        {/* ─── DONE PHASE ─── */}
+        {stage === "done" && (
+          <motion.div
+            key="done"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="flex flex-col items-center justify-center gap-6 bg-gradient-to-br from-green-400 to-yellow-400 p-8 rounded-2xl shadow-xl w-full max-w-lg"
+          >
+            <h2 className="text-2xl font-bold text-white">
+              All Photos Ready 🎉
+            </h2>
+
+            <p className="text-white/80 text-sm">
+              Backgrounds removed and uploaded successfully.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {finalUrls.map((url, i) => (
+                <motion.img
+                  key={i}
+                  src={url}
+                  alt={`final-${i}`}
+                  className="w-32 h-32 object-cover rounded-lg shadow-lg border-4 border-white"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                />
+              ))}
+            </div>
+
+            <Button
+              onClick={() => window.location.reload()}
+              className="bg-white text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100"
+            >
+              Start Over
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   );
 };
 
